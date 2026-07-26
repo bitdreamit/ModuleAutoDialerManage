@@ -15,19 +15,23 @@ This module turns MikoPBX into a professional outbound campaign dialer. It can c
 2. [Installation](#2-installation)
 3. [Quickstart — your first campaign in 5 minutes](#3-quickstart--your-first-campaign-in-5-minutes)
 4. [The main module page](#4-the-main-module-page)
-5. [Creating a campaign](#5-creating-a-campaign)
-6. [Working with surveys (polls)](#6-working-with-surveys-polls)
-7. [Extensions setup](#7-extensions-setup)
-8. [Live dashboard](#8-live-dashboard)
-9. [DNC blacklist](#9-dnc-blacklist)
-10. [AMD (Answering Machine Detection)](#10-amd-answering-machine-detection)
-11. [Scheduling (business hours)](#11-scheduling-business-hours)
-12. [Webhook — get notified when a campaign completes](#12-webhook--get-notified-when-a-campaign-completes)
-13. [Call recordings](#13-call-recordings)
-14. [Reports & CSV export](#14-reports--csv-export)
-15. [Settings reference](#15-settings-reference)
-16. [Troubleshooting](#16-troubleshooting)
-17. [Uninstall & rollback](#17-uninstall--rollback)
+5. **[Creating a campaign via UI](#5-creating-a-campaign)**
+6. **[Campaigns list page](#6-campaigns-list-page)**
+7. [Working with surveys (polls)](#7-working-with-surveys-polls)
+8. [Extensions setup](#8-extensions-setup)
+9. [Live dashboard](#9-live-dashboard)
+10. [Call results browser](#10-call-results-browser)
+11. [IVR / poll answers browser](#11-ivr--poll-answers-browser)
+12. [Audio files management](#12-audio-files-management)
+13. [DNC blacklist](#13-dnc-blacklist)
+14. [AMD (Answering Machine Detection)](#14-amd-answering-machine-detection)
+15. [Scheduling (business hours)](#15-scheduling-business-hours)
+16. [Webhook — get notified when a campaign state changes](#16-webhook--get-notified-when-a-campaign-state-changes)
+17. [Call recordings](#17-call-recordings)
+18. [Reports & CSV export](#18-reports--csv-export)
+19. [Settings reference](#19-settings-reference)
+20. [Troubleshooting](#20-troubleshooting)
+21. [Uninstall & rollback](#21-uninstall--rollback)
 
 ---
 
@@ -197,6 +201,22 @@ The main page (sidebar → **Auto dialer**) has four sections:
 
 A **campaign** (called a "task" in the API) is a list of phone numbers to dial, plus rules about how to dial them.
 
+### Via the UI (recommended for operators)
+
+1. Sidebar → **Campaigns** (under Routing group)
+2. Click **New campaign** button (top right)
+3. Fill in the form:
+   - **Basic section** — name, CRM ID, state (open/paused/closed), description
+   - **Call routing** — type (extension or survey), inner number/extension, max simultaneous calls, dial prefix, callback mode
+   - **Schedule** — start time, end time, allowed weekdays (multi-select)
+   - **Retry policy** — max attempts, seconds between retries, "retry until signal" toggle
+   - **Advanced** — AMD toggle, webhook URL
+   - **Phone numbers** — add via 3 tabs:
+     - **Single add** — number + optional name + TTS text
+     - **Paste bulk** — paste multi-line list (format: `number,name,params`)
+     - **CSV upload** — upload CSV file with header `number, name, params`
+4. Click **Create campaign** — you'll be redirected to the edit page
+
 ### Via REST API (recommended for automation)
 
 ```bash
@@ -308,7 +328,39 @@ number,name,params
 
 ---
 
-## 6. Working with surveys (polls)
+## 6. Campaigns list page
+
+Sidebar → **Campaigns** (under Routing group)
+
+This is the main management page for all your campaigns. Features:
+
+### Filter bar (top)
+- **Search by name** — full-text search on campaign name + description + ID
+- **State dropdown** — filter by open / closed / paused
+- **Type dropdown** — filter by extension-bridged or survey/IVR
+- **Search button** — apply filters
+
+### Sortable columns
+Click any column header to sort ascending/descending:
+- ID, Name, State, Type, Inner num, Channels, Time window, Schedule, Flags
+
+### Per-row actions (right column)
+Each campaign row has 5 action buttons:
+- 📊 **Live detail** — open the dashboard detail page for this campaign
+- ✏️ **Edit** — open the campaign form to edit settings/numbers
+- ⬇️ **CSV** — download all call results for this campaign as CSV
+- ⏯ **Pause/Resume** — toggle state between open (0) and paused (2)
+- 🗑 **Delete** — permanently delete the campaign (asks for confirmation)
+
+### New campaign button (top right)
+Click **New campaign** to open the create form (see §5).
+
+### Live dashboard button (top right)
+Click **Live dashboard** to open the dashboard overview.
+
+---
+
+## 7. Working with surveys (polls)
 
 A **survey** (poll) is a multi-question IVR tree. When `innerNumType=polling`, the dialer plays the survey instead of bridging to an agent.
 

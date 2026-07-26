@@ -218,6 +218,149 @@ class ModuleAutoDialerManageController extends BaseController
         $this->view->pick("{$this->moduleDir}/App/Views/blacklist");
     }
 
+    /**
+     * Bit Dream IT extension: Campaigns list page.
+     * Sortable/filterable table of all campaigns with state, channels, etc.
+     */
+    public function campaignsAction(): void
+    {
+        $footerCollection = $this->assets->collection('footerJS');
+        $footerCollection->addJs('js/vendor/datatable/dataTables.semanticui.js', true);
+        $footerCollection->addJs('js/vendor/vue.js', true);
+        $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-auto-dialer-manage-campaigns.js", true);
+
+        $headerCollectionCSS = $this->assets->collection('headerCSS');
+        $headerCollectionCSS->addCss("css/cache/{$this->moduleUniqueID}/module-auto-dialer-manage.css", true);
+        $headerCollectionCSS->addCss('css/vendor/datatable/dataTables.semanticui.min.css', true);
+
+        $this->view->apiBaseUrl = "/pbxcore/api/module-dialer-manage/v1";
+        $this->view->pick("{$this->moduleDir}/App/Views/campaigns");
+    }
+
+    /**
+     * Bit Dream IT extension: Campaign create/edit form.
+     * Pass an ID in the URL to edit; no ID = create new.
+     */
+    public function campaignFormAction(string $id = ''): void
+    {
+        $footerCollection = $this->assets->collection('footerJS');
+        $footerCollection->addJs('js/pbx/main/form.js', true);
+        $footerCollection->addJs('js/vendor/vue.js', true);
+        $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-auto-dialer-manage-campaign-form.js", true);
+
+        $headerCollectionCSS = $this->assets->collection('headerCSS');
+        $headerCollectionCSS->addCss("css/cache/{$this->moduleUniqueID}/module-auto-dialer-manage.css", true);
+
+        $task = null;
+        if ($id !== '') {
+            $taskObj = \Modules\ModuleAutoDialerManage\Models\Tasks::findFirstById($id);
+            if ($taskObj) {
+                $task = $taskObj->toArray();
+            }
+        }
+        // Load pollings for the dropdown selector
+        $pollings = \Modules\ModuleAutoDialerManage\Models\Polling::find()->toArray();
+        // Load extensions for the inner-num dropdown
+        $extensions = \Modules\ModuleAutoDialerManage\Models\DialerExtensions::find()->toArray();
+        // Load all SIP extensions from MikoPBX (so user can pick any, not just configured ones)
+        $allExtensions = \MikoPBX\Common\Models\Extensions::find([
+            'type = :type:',
+            'bind' => ['type' => \MikoPBX\Common\Models\Extensions::TYPE_SIP]
+        ])->toArray();
+
+        $this->view->task         = $task;
+        $this->view->taskId       = $id;
+        $this->view->pollings     = $pollings;
+        $this->view->extensions   = $extensions;
+        $this->view->allExtensions = $allExtensions;
+        $this->view->apiBaseUrl   = "/pbxcore/api/module-dialer-manage/v1";
+        $this->view->pick("{$this->moduleDir}/App/Views/campaignForm");
+    }
+
+    /**
+     * Bit Dream IT extension: Call results browser.
+     * Paginated, filterable by campaign / state / date range.
+     */
+    public function resultsAction(): void
+    {
+        $footerCollection = $this->assets->collection('footerJS');
+        $footerCollection->addJs('js/vendor/datatable/dataTables.semanticui.js', true);
+        $footerCollection->addJs('js/vendor/vue.js', true);
+        $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-auto-dialer-manage-results.js", true);
+
+        $headerCollectionCSS = $this->assets->collection('headerCSS');
+        $headerCollectionCSS->addCss("css/cache/{$this->moduleUniqueID}/module-auto-dialer-manage.css", true);
+        $headerCollectionCSS->addCss('css/vendor/datatable/dataTables.semanticui.min.css', true);
+
+        // Load all campaigns for the filter dropdown
+        $tasks = \Modules\ModuleAutoDialerManage\Models\Tasks::find([
+            'order' => 'id DESC',
+        ])->toArray();
+        $this->view->tasks       = $tasks;
+        $this->view->apiBaseUrl  = "/pbxcore/api/module-dialer-manage/v1";
+        $this->view->pick("{$this->moduleDir}/App/Views/results");
+    }
+
+    /**
+     * Bit Dream IT extension: Polling (IVR) results browser.
+     */
+    public function pollingResultsAction(): void
+    {
+        $footerCollection = $this->assets->collection('footerJS');
+        $footerCollection->addJs('js/vendor/datatable/dataTables.semanticui.js', true);
+        $footerCollection->addJs('js/vendor/vue.js', true);
+        $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-auto-dialer-manage-polling-results.js", true);
+
+        $headerCollectionCSS = $this->assets->collection('headerCSS');
+        $headerCollectionCSS->addCss("css/cache/{$this->moduleUniqueID}/module-auto-dialer-manage.css", true);
+        $headerCollectionCSS->addCss('css/vendor/datatable/dataTables.semanticui.min.css', true);
+
+        $pollings = \Modules\ModuleAutoDialerManage\Models\Polling::find()->toArray();
+        $this->view->pollings   = $pollings;
+        $this->view->apiBaseUrl = "/pbxcore/api/module-dialer-manage/v1";
+        $this->view->pick("{$this->moduleDir}/App/Views/pollingResults");
+    }
+
+    /**
+     * Bit Dream IT extension: Audio files management page.
+     * Upload, list, delete, and play prompts.
+     */
+    public function audioAction(): void
+    {
+        $footerCollection = $this->assets->collection('footerJS');
+        $footerCollection->addJs('js/vendor/vue.js', true);
+        $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-auto-dialer-manage-audio.js", true);
+
+        $headerCollectionCSS = $this->assets->collection('headerCSS');
+        $headerCollectionCSS->addCss("css/cache/{$this->moduleUniqueID}/module-auto-dialer-manage.css", true);
+
+        $this->view->apiBaseUrl = "/pbxcore/api/module-dialer-manage/v1";
+        $this->view->pick("{$this->moduleDir}/App/Views/audio");
+    }
+
+    /**
+     * Bit Dream IT extension: In-module Developer API Guide page.
+     * Shows all REST endpoints with copy-paste curl / Laravel / PHP / Python examples.
+     * Designed to be accessible from the sidebar while building integrations.
+     */
+    public function apiGuideAction(): void
+    {
+        $footerCollection = $this->assets->collection('footerJS');
+        $footerCollection->addJs('js/vendor/vue.js', true);
+        $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-auto-dialer-manage-api-guide.js", true);
+
+        $headerCollectionCSS = $this->assets->collection('headerCSS');
+        $headerCollectionCSS->addCss("css/cache/{$this->moduleUniqueID}/module-auto-dialer-manage.css", true);
+        $headerCollectionCSS->addCss('css/vendor/highlight/default.min.css', true);
+
+        // Detect PBX host for example URLs
+        $scheme = ($_SERVER['HTTPS'] ?? 'off') === 'on' ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'your-pbx.local';
+        $this->view->pbxHost    = $scheme . '://' . $host;
+        $this->view->apiBaseUrl = "/pbxcore/api/module-dialer-manage/v1";
+        $this->view->pick("{$this->moduleDir}/App/Views/apiGuide");
+    }
+
     public function modifyExtensionAction(string $id=''): void
     {
         // Add JavaScript files to the footer collection

@@ -79,8 +79,8 @@ class PbxExtensionSetup extends PbxExtensionSetupBase
     }
 
     /**
-     * Bit Dream IT extension: registers sidebar menu items for the main
-     * module page, the live dashboard, and the DNC blacklist.
+     * Bit Dream IT extension: registers sidebar menu items for ALL module pages.
+     * Pages: main, campaigns, dashboard, blacklist, results, polling-results, audio.
      */
     public function addToSidebar(): bool
     {
@@ -93,6 +93,13 @@ class PbxExtensionSetup extends PbxExtensionSetupBase
                 'showAtSidebar' => true,
             ],
             [
+                'uniqid'        => $this->moduleUniqueID . '-campaigns',
+                'group'         => 'routing',
+                'iconClass'     => 'list',
+                'caption'       => "Breadcrumb{$this->moduleUniqueID}Campaigns",
+                'showAtSidebar' => true,
+            ],
+            [
                 'uniqid'        => $this->moduleUniqueID . '-dashboard',
                 'group'         => 'routing',
                 'iconClass'     => 'dashboard',
@@ -100,10 +107,38 @@ class PbxExtensionSetup extends PbxExtensionSetupBase
                 'showAtSidebar' => true,
             ],
             [
+                'uniqid'        => $this->moduleUniqueID . '-results',
+                'group'         => 'routing',
+                'iconClass'     => 'phone',
+                'caption'       => "Breadcrumb{$this->moduleUniqueID}Results",
+                'showAtSidebar' => true,
+            ],
+            [
+                'uniqid'        => $this->moduleUniqueID . '-polling-results',
+                'group'         => 'routing',
+                'iconClass'     => 'list ul',
+                'caption'       => "Breadcrumb{$this->moduleUniqueID}PollingResults",
+                'showAtSidebar' => true,
+            ],
+            [
+                'uniqid'        => $this->moduleUniqueID . '-audio',
+                'group'         => 'routing',
+                'iconClass'     => 'file audio',
+                'caption'       => "Breadcrumb{$this->moduleUniqueID}Audio",
+                'showAtSidebar' => true,
+            ],
+            [
                 'uniqid'        => $this->moduleUniqueID . '-blacklist',
                 'group'         => 'routing',
                 'iconClass'     => 'ban',
                 'caption'       => "Breadcrumb{$this->moduleUniqueID}Blacklist",
+                'showAtSidebar' => true,
+            ],
+            [
+                'uniqid'        => $this->moduleUniqueID . '-apiguide',
+                'group'         => 'routing',
+                'iconClass'     => 'code',
+                'caption'       => "Breadcrumb{$this->moduleUniqueID}ApiGuide",
                 'showAtSidebar' => true,
             ],
         ];

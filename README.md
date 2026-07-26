@@ -12,9 +12,26 @@ A professional outbound campaign dialer that turns MikoPBX into a complete call-
 ## Quick links
 
 - 📖 [**User Guide**](docs/USER-GUIDE.md) — operator manual, A to Z
-- 🔌 [**Developer Guide**](docs/DEVELOPER-GUIDE.md) — REST API reference + Laravel/PHP/Python examples
+- 🔌 [**Developer Guide**](docs/DEVELOPER-GUIDE.md) — REST API reference + Laravel/PHP/Python examples (also available in-module: sidebar → **API guide**)
 - 📋 [**Changelog**](docs/CHANGELOG.md) — what's new in this Bit Dream IT edition
 - 🐛 [**Issue tracker**](https://github.com/bitdreamit/ModuleAutoDialerManage/issues) — bug reports & feature requests
+
+## After install — sidebar shows 8 items
+
+The module adds 8 menu items under **Routing** in the MikoPBX sidebar:
+
+| # | Sidebar item | Purpose |
+|---|---|---|
+| 1 | **Auto dialer** | Original module page (settings, extensions, surveys tables) |
+| 2 | **Campaigns** | List + create + edit + delete + pause/resume campaigns (UI) |
+| 3 | **Dialer dashboard** | Live overview + per-campaign detail with live stats |
+| 4 | **Call results** | Browse/filter/export call results |
+| 5 | **IVR answers** | Browse poll/survey answers |
+| 6 | **Audio files** | Upload/manage pre-recorded prompts |
+| 7 | **DNC blacklist** | Manage Do-Not-Call numbers |
+| 8 | **API guide** | **In-module REST API reference** with copy-paste examples (curl, Laravel, PHP, Python, JS) |
+
+**Both UI and API work at the same time.** The web UI calls the same REST endpoints documented in the API guide. You can use the UI for day-to-day operations AND call the API from external systems (Laravel, Python, 1C, etc.) simultaneously — they share the same database.
 
 ---
 
