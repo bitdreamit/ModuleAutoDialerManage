@@ -1,0 +1,48 @@
+<?php
+return [
+    /*
+ * MikoPBX - free phone system for small business
+ * Copyright © 2017-2023 Alexey Portnov and Nikolay Beketov
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+    'repModuleAutoDialerManage' => 'Autoinformer - %repesent%',
+    'mo_ModuleModuleAutoDialerManage' => 'Autoinformer',
+    'BreadcrumbModuleAutoDialerManage' => 'Module Autoinformer',
+    'SubHeaderModuleAutoDialerManage' => 'Composition automatique du numéro client et connexion avec le numéro interne du PBX',
+    'module_template_AddNewRecord' => 'Ajouter',
+    'mod_AutoDialer_defDialPrefix' => 'Préfixe de numérotation',
+    'mod_AutoDialer_yandexApiKey' => 'Clé API Yandex',
+    'mod_AutoDialer_questionText' => 'Texte de la question',
+    'mod_AutoDialer_questionOptionsTitle' => 'Options de questions',
+    'mod_AutoDialer_timeoutWaitTime' => 'Expiration du délai d\'entrée c.',
+    'mod_AutoDialer_defPress' => 'Valeur d\'entrée par défaut',
+    'mod_AutoDialer_Press' => 'Action de saisie ',
+    'mod_AutoDialer_playback_record' => 'Question supplémentaire ',
+    'mod_AutoDialer_answer' => 'Geler la sélection',
+    'mod_AutoDialer_PressValueOptions' => 'Délai d\'entrée',
+    'mod_AutoDialer_PressValue' => 'Texte de question supplémentaire',
+    'mod_AutoDialer_NamePolling' => 'Nom',
+    'mod_AutoDialer_AddQuestion' => 'Ajouter',
+    'mod_AutoDialer_TabPolling' => 'Sondages',
+    'mod_AutoDialer_TabSettings' => 'Paramètres',
+    'mod_AutoDialer_TabExtensions' => 'Plan de numérotation',
+    'mod_AutoDialer_ExtenTableNumber' => 'Numéro de poste',
+    'mod_AutoDialer_ExtenTablePollingIdOK' => 'Sondage si client trouvé',
+    'mod_AutoDialer_ExtenTablePollingIdFAIL' => 'Enquête si nouveau client',
+    'mod_AutoDialer_PollingTableName' => 'Nom',
+    'mod_AutoDialer_AddExtension' => 'Ajouter',
+    'BreadcrumbModuleAutoDialerManageModifyPolling' => 'Enquête',
+    'BreadcrumbModuleAutoDialerManageModifyExtension' => 'Extension',
+];
