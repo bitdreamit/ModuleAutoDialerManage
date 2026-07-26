@@ -1,490 +1,1316 @@
+# ModuleAutoDialerManage — Professional Campaign Dialer for MikoPBX
 
-@sessions/CLAUDE.sessions.md
+**Version 1.35 — Bit Dream IT edition**
+**Package:** `bitdreamit/module-auto-dialer-manage`
+**License:** GPL-3.0-or-later
+**Forked from:** `mikopbx/ModuleAutoDialer` v1.35 by Alexey Portnov & Nikolay Beketov (MIKO LLC)
 
-# CLAUDE.md
+A professional outbound campaign dialer that turns MikoPBX into a complete call-center engine. Create campaigns, manage DNC blacklists, detect answering machines, monitor live progress, and integrate with any external CRM via REST API.
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
 
-## CRITICAL RULES
+## Quick links
 
-- **Git commit и push ТОЛЬКО с явного разрешения пользователя.** Никогда не выполнять `git commit` или `git push` без явной просьбы.
+- 📖 [**User Guide**](docs/USER-GUIDE.md) — operator manual, A to Z
+- 🔌 [**Developer Guide**](docs/DEVELOPER-GUIDE.md) — REST API reference + Laravel/PHP/Python examples (also available in-module: sidebar → **API guide**)
+- 📋 [**Changelog**](docs/CHANGELOG.md) — what's new in this Bit Dream IT edition
+- 🐛 [**Issue tracker**](https://github.com/bitdreamit/ModuleAutoDialerManage/issues) — bug reports & feature requests
 
-## Обзор проекта
+## After install — sidebar shows 8 items
 
-ModuleAutoDialerManage — модуль расширения для MikoPBX, реализующий автоматический обзвон и IVR-опросы. Модуль работает поверх Asterisk PBX и использует Phalcon MVC фреймворк.
+The module adds 8 menu items under **Routing** in the MikoPBX sidebar:
 
-- **Язык**: PHP 7.4+, JavaScript/ES6, Volt-шаблоны
-- **Фреймворк**: Phalcon 5.8 (наследуется от MikoPBX Core)
-- **Namespace**: `Modules\ModuleAutoDialerManage\`
-- **Минимальная версия PBX**: 2024.1.114
+| # | Sidebar item | Purpose |
+|---|---|---|
+| 1 | **Auto dialer** | Original module page (settings, extensions, surveys tables) |
+| 2 | **Campaigns** | List + create + edit + delete + pause/resume campaigns (UI) |
+| 3 | **Dialer dashboard** | Live overview + per-campaign detail with live stats |
+| 4 | **Call results** | Browse/filter/export call results |
+| 5 | **IVR answers** | Browse poll/survey answers |
+| 6 | **Audio files** | Upload/manage pre-recorded prompts |
+| 7 | **DNC blacklist** | Manage Do-Not-Call numbers |
+| 8 | **API guide** | **In-module REST API reference** with copy-paste examples (curl, Laravel, PHP, Python, JS) |
 
-## Структура каталогов
+**Both UI and API work at the same time.** The web UI calls the same REST endpoints documented in the API guide. You can use the UI for day-to-day operations AND call the API from external systems (Laravel, Python, 1C, etc.) simultaneously — they share the same database.
 
-| Каталог | Назначение |
+---
+
+## What's new in this Bit Dream IT edition
+
+This fork adds 10+ professional features on top of MIKO's original module:
+
+| Feature | Description |
 |---|---|
-| `Setup/` | Установка/удаление модуля (`PbxExtensionSetup`) |
-| `App/Controllers/` | Web-контроллеры (admin-интерфейс) |
-| `App/Forms/` | Phalcon-формы для UI |
-| `App/Views/` | Volt-шаблоны |
-| `App/Providers/` | DI-сервис-провайдеры (View, Volt) |
-| `Lib/` | Бизнес-логика, утилиты, конфигурация Asterisk |
-| `Lib/RestAPI/Controllers/` | REST API эндпоинты (отдельно от admin) |
-| `bin/` | Фоновые воркеры (CLI-скрипты) |
-| `Models/` | Phalcon ORM модели (12 файлов) |
-| `agi-bin/` | AGI-скрипты Asterisk |
-| `Messages/` | i18n переводы (28+ языков) |
-| `public/assets/js/src/` | Исходники JS (компилируются Babel) |
-| `public/assets/js/` | Скомпилированные JS + source maps |
-| `tests/` | Тестовый фреймворк: unit/integration + E2E тесты |
-| `1c/` | Интеграция с 1C:Enterprise |
+| **Live dashboard** | Real-time campaign monitoring with progress bars, agent status, recent calls feed. Auto-refreshes every 4s. |
+| **DNC blacklist** | Do-Not-Call list — numbers that the dialer will never call. Full UI + REST API. |
+| **AMD** | Per-campaign Answering Machine Detection. Voicemail machines are auto-skipped. |
+| **Webhook** | `callbackUrl` field — fires `campaign.completed` event with stats when a campaign finishes. |
+| **Scheduling** | Per-campaign `scheduleDays` (ISO weekdays) — skip dialing on weekends, etc. |
+| **Summary report** | One-click totals: dialed, answered, answer rate, avg duration. |
+| **CSV import/export** | Bulk-upload numbers, download results as CSV (Excel-friendly). |
+| **Test call** | Preview a campaign by dialing a single test number first. |
+| **Recording lookup** | REST endpoint joins campaign calls to MikoPBX CDR for audio file path. |
+| **Coexistence** | Renamed DB tables, dialplan contexts, REST API URLs — runs alongside the original module without conflict. |
+| **Data migration** | On install, copies all existing data from the original module's tables. Old tables kept as backup. |
 
-## Команды
+---
+
+## Quickstart
+
+### Install
+
+1. Back up MikoPBX (System → Backup)
+2. MikoPBX → Modules → Install from file → upload `ModuleAutoDialerManage.zip`
+3. Clear caches: `rm -rf /var/tmp/www_cache/volt/* /var/tmp/www_cache/translations/* && /etc/rc.d/rc.php-fpm restart`
+4. Restart workers: `/etc/rc.d/rc.worker-safe-scripts restart`
+5. Sidebar → **Auto dialer** (under Routing)
+
+### Make your first call
 
 ```bash
-# Установка PHP-зависимостей
-composer install
-
-# Проверка синтаксиса
-php -l <file.php>
-
-# Фоновые воркеры (запускаются на PBX-системе)
-php bin/ConnectorDB.php   # IPC-диспетчер, все операции с БД
-php bin/WorkerDialer.php  # Основной воркер обзвона
-php bin/WorkerAMI.php     # Обработка AMI-событий Asterisk
+curl -X POST http://YOUR_PBX_IP/pbxcore/api/module-dialer-manage/v1/task \
+  -H "Content-Type: application/json" \
+  -d '{
+    "crmId": 1,
+    "name": "Quickstart test",
+    "state": 0,
+    "innerNum": "200",
+    "innerNumType": "exten",
+    "maxCountChannels": 1,
+    "dialPrefix": "999",
+    "numbers": [
+      {"number": "7912345678", "params": {"speach": "Hello, this is a test."}}
+    ]
+  }'
 ```
 
-Схема БД создаётся автоматически из аннотаций Phalcon-моделей при вызове `PbxExtensionSetup::installDB()`.
+Watch it dial in real-time: sidebar → **Dialer dashboard**.
 
-### Кэши (после изменения Messages/*.php или Volt-шаблонов)
-```bash
-ssh serber@boffart.miko.ru 'redis-cli -n 4 FLUSHDB && rm -rf /var/tmp/www_cache/volt/* && php -r "opcache_reset();" 2>/dev/null'
-```
-- Redis DB#4: кэш переводов (`LocalisationArray:*`), TTL 1 час
-- `/var/tmp/www_cache/volt/`: скомпилированные Volt-шаблоны
-- OPcache: скомпилированные PHP (включая Messages/*.php)
+For the full tutorial, see the [User Guide](docs/USER-GUIDE.md).
 
-## Build & CI
+---
 
-GitHub Actions workflow (`.github/workflows/build.yml`) срабатывает на push в `master`/`develop` и использует reusable workflow из `mikopbx/.github-workflows`:
-```yaml
-jobs:
-  build:
-    uses: mikopbx/.github-workflows/.github/workflows/extension-publish.yml@master
-    with:
-      initial_version: "1.34"
-    secrets: inherit
-```
+## REST API summary
 
-## Сборка JavaScript
+Base URL: `/pbxcore/api/module-dialer-manage/v1`
 
-Исходники: `public/assets/js/src/` — **редактировать только файлы в `src/`**.
-Скомпилированные файлы в `public/assets/js/*.js` — автогенерируемые, не редактировать вручную.
-
-Сборка через Babel (пресет `airbnb`, source maps включены).
-PHPStorm File Watcher: https://docs.mikopbx.com/mikopbx-development/prepare-ide-tools/mac#phpstorm-setup-babel
-
-Ручная сборка:
-```bash
-cd /Users/apor/Developement/MikoPBX/MikoPBXUtils && \
-cp babel.config.json babel.config.json.bak && \
-echo '{"presets":[["@babel/preset-env",{"targets":{"chrome":50,"ie":11,"firefox":45}}]]}' > babel.config.json && \
-./node_modules/.bin/babel \
-  /Volumes/DevDisk/apor/Developement/MikoPBX/Extensions/ModuleAutoDialerManage/public/assets/js/src/module-auto-dialer-manage-index.js \
-  --out-dir /Volumes/DevDisk/apor/Developement/MikoPBX/Extensions/ModuleAutoDialerManage/public/assets/js/ \
-  --source-maps && \
-mv babel.config.json.bak babel.config.json
-```
-
-## Архитектура
-
-### Основной поток данных обзвона
-
-1. Внешняя система (CRM/1C) создаёт задачу через REST API (`POST /pbxcore/api/module-dialer-manage/v1/task`)
-2. `ApiController` вызывает `ConnectorDB::invoke('addTask', ...)` — синхронный IPC через Beanstalk
-3. `ConnectorDB` (фоновый воркер) сохраняет задачу и номера в БД
-4. `WorkerDialer` получает срез задач через `ConnectorDB::invoke('getSliceTask')`, создаёт call-файлы Asterisk
-5. Asterisk выполняет вызовы, AGI-скрипты (`agi-bin/`) фиксируют результаты
-6. `WorkerAMI` слушает AMI-события и обновляет статусы через `ConnectorDB::invoke('saveStateData', ...)`
-
-### Режим callback
-
-При `isCallback=1` порядок вызова меняется: сначала звонок на внутренний номер сотрудника, затем — на внешний номер клиента. Генерируется через контекст `dialer-manage-out-originate-in-callback`.
-
-### Повторные попытки дозвона
-
-- `maxAttempt` — количество попыток
-- `tryInterval` — интервал между попытками (секунды)
-- `attemptUntilSignal=1` — повторять до внешнего сигнала (`task-signal-close`), игнорируя статус дозвона
-- При каждой повторной попытке создаётся новая запись в `TaskResults` с инкрементом `attemptNumber`
-
-### Группировка номеров по клиенту
-
-При указании `clientId` в номерах задачи: если дозвонились на один номер клиента, остальные номера того же клиента автоматически закрываются с результатом `SUCCESS_ANOTHER_PHONE`.
-
-Дополнительно реализована защита от одновременного обзвона нескольких номеров одного клиента: `ConnectorDB::getSliceTask()` проверяет наличие активных (незакрытых) вызовов по `clientId` и подставляет номер другого клиента через приватный метод `findAvailablePhone()`. Если все доступные номера принадлежат занятым клиентам, задача пропускается до следующего цикла.
-
-### Ключевые компоненты
-
-| Компонент | Путь | Назначение |
+| Method | Endpoint | Purpose |
 |---|---|---|
-| REST API | `Lib/RestAPI/Controllers/ApiController.php` | Все внешние эндпоинты модуля |
-| IPC-диспетчер | `bin/ConnectorDB.php` | Мост между веб-слоем и воркерами, все операции с БД |
-| Dialer-воркер | `bin/WorkerDialer.php` | Основной цикл обзвона, создание call-файлов, callback |
-| AMI-воркер | `bin/WorkerAMI.php` | Обработка событий Asterisk в реальном времени |
-| Конфигурация | `Lib/AutoDialerConf.php` | Генерация Asterisk-диалплана (контексты `dialer-manage-out-originate-in`, `dialer-polling`, `dialer-manage-out-originate-in-callback`) |
-| Утилиты | `Lib/AutoDialerMain.php` | Настройки PBX, список extension'ов, Redis-кеш, конвертация аудио |
-| TTS Yandex | `Lib/YandexSynthesize.php` | Синтез речи через Yandex Cloud API |
-| TTS RHVoice | `Lib/RHVoiceSynthesize.php` | Синтез речи через локальный сервер RHVoice |
-| AGI-скрипты | `agi-bin/saveResult.php`, `change-state-task.php`, `gen-update-media-file.php` | Исполняются Asterisk'ом в контексте вызова |
-| Cron-watchdog | `bin/safe.php` | Проверка и перезапуск воркеров из cron; убивает дубликаты процессов |
+| `POST` | `/task` | Create campaign |
+| `GET` | `/task` | List campaigns |
+| `PUT` | `/task/{id}` | Update campaign (pause/resume/close) |
+| `DELETE` | `/task/{id}` | Delete campaign |
+| `GET` | `/task/{id}/status` | Live status (poll every 3-5s) |
+| `GET` | `/task/{id}/summary` | Summary report |
+| `GET` | `/task/{id}/export` | CSV export |
+| `POST` | `/task/{id}/import-csv` | CSV import |
+| `POST` | `/task/{id}/test-call` | Test call single number |
+| `GET` | `/results/{changeTime}` | Call results (incremental) |
+| `GET` | `/polling-results/{changeTime}` | Poll results (incremental) |
+| `POST` | `/blacklist` | Add to DNC |
+| `GET` | `/blacklist` | List DNC (paginated) |
+| `DELETE` | `/blacklist/{number}` | Remove from DNC |
+| `GET` | `/agents-status` | Agent status panel |
+| `GET` | `/recording/{linkedId}` | Recording file lookup |
+| `POST/GET/DELETE` | `/audio` | Audio file management |
+| `POST/GET/DELETE` | `/polling` | Survey management |
 
-### Межпроцессное взаимодействие (IPC)
+Full API reference with examples: [Developer Guide](docs/DEVELOPER-GUIDE.md).
 
-Весь IPC идёт через `ConnectorDB::invoke(funcName, args)` — статический метод, который:
-- Отправляет JSON-сообщение в Beanstalk-очередь `ConnectorDB`
-- Воркер `ConnectorDB::onEvents()` десериализует и вызывает метод по имени
-- Результат сериализуется и возвращается через `$tube->reply()`
+---
 
-Флаг `$retVal = false` позволяет fire-and-forget без ожидания ответа.
+## Laravel integration example
 
-### Модели данных (Models/)
-
-- `Tasks` — задачи обзвона (states: `STATE_OPEN=0`, `STATE_CLOSE=1`, `STATE_PAUSE=2`; retry: `maxAttempt`, `tryInterval`, `attemptUntilSignal`; рабочее время: `timeStart`, `timeEnd`; callback: `isCallback`)
-- `TaskResults` — результаты по каждому номеру в задаче (`clientId` для группировки, `attemptNumber` для попыток)
-- `Polling` / `Question` / `QuestionActions` — IVR-опросы с деревом вопросов
-- `PolingResults` — результаты опросов
-- `AudioFiles` — метаданные загруженных аудиофайлов
-- `Clients` / `ClientsPhones` / `ClientsProperties` — справочник клиентов с телефонами и произвольными свойствами
-- `DialerExtensions` — настройки внутренних номеров для опросов (web-интерфейс)
-- `ModuleAutoDialerManage` — глобальные настройки модуля (`defDialPrefix`, `yandexApiKey`, `ttsService`, `callbackAlertText`)
-
-### TTS-сервисы (`ModuleAutoDialerManage::ttsService`)
-
-- `YANDEX` — Yandex Cloud SpeechKit (`Lib/YandexSynthesize.php`), требует `yandexApiKey`
-- `RH_VOICE` — локальный RHVoice (`Lib/RHVoiceSynthesize.php`), порт 8081, кеширование по хешу текст+голос+rate
-
-### STT Yandex (`Lib/YandexRecognize.php`)
-- Формат: LPCM (sox WAV→raw PCM 8kHz 16bit mono), эндпоинт `stt.api.cloud.yandex.net/speech/v1/stt:recognize`
-- Авторизация: `Api-Key` + обязательный `folderId` в query-параметрах
-- Роль `ai.speechkit-stt.user` (не `yc.ai.speechkitStt.execute`) для классического API
-- Настройки: `ModuleAutoDialerManage.yandexApiKey` + `ModuleAutoDialerManage.yandexFolderId`
-
-### Вопрос-подтверждение STT (`Question.type = 'confirmation'`)
-- `QuestionActions.needRecognize` = '1' + `recognizeLabel` — на уровне press-действия `playback_record`
-- `PolingResults.recognizedText` / `recognizeLabel` — результат распознавания
-- AGI `confirm-stt.php` — собирает STT-результаты по linkedId, генерирует TTS, озвучивает для подтверждения
-- Гарантия порядка: Beanstalk FIFO — sync `getRecognizedResults` выполнится после всех `savePolingResult`
-
-### Параметры клиента в шаблонах опросов
-- `<NAME>` — имя клиента из `Clients.name` (добавляется в `findClientByPhone()`)
-- `<KEY>` — любой ключ из `ClientsProperties` (ADDRES, ACCOUNT_1 и т.д.)
-- Свойства из `ClientsProperties` имеют приоритет над `Clients.name` при дублировании ключа `NAME`
-
-### Result-коды (`ConnectorDB::RESULT_*`)
-
-`SUCCESS`, `SUCCESS_CLIENT_H`, `SUCCESS_USER_H`, `SUCCESS_POLLING`, `SUCCESS_ANOTHER_PHONE`, `SUCCESS_EXTERNAL_SIGNAL`, `FAIL`, `FAIL_CLIENT_H_BEFORE_ANSWER`, `FAIL_USER_NO_ANSWER`, `FAIL_USER_BUSY`, `FAIL_ROUTE`, `FAIL_PROVIDER`, `FAIL_POLLING`
-
-### Внешние зависимости
-
-- **Asterisk PBX** — AGI/AMI интеграция
-- **Beanstalk** — очередь сообщений для IPC между процессами
-- **Redis** — кеширование (префикс `auto_dialer_`, TTL 86400с)
-- **Yandex Cloud TTS** или **RHVoice** — синтез речи для вопросов опроса
-- **sox/lame** — конвертация аудиофайлов
-- **PHPSpreadsheet** — парсинг XLS/XLSX файлов со списками номеров
-
-### REST API эндпоинты
-
-Базовый путь: `/pbxcore/api/module-dialer-manage/v1/`
-
-**Задачи:**
-- `POST /task` — создать задачу обзвона
-- `GET /task`, `GET /task/{id}` — список задач / детали задачи
-- `PUT /task/{id}` — изменить задачу (state, параметры)
-- `DELETE /task/{id}` — удалить задачу
-- `POST /task-signal-close` — остановить обзвон по номеру телефона
-
-**Клиенты:**
-- `POST /client` — создать/обновить клиентов (массив)
-- `DELETE /client/{crmId}` — удалить клиента
-- `GET /client-by-phone/{phone}` — найти клиента по номеру
-
-**Опросы:**
-- `POST /polling` — создать/обновить опрос
-- `GET /polling`, `GET /polling/{id}` — список / детали опроса
-- `DELETE /polling/{id}` — удалить опрос
-
-**Результаты:**
-- `GET /results/{changeTime}` — результаты обзвона (инкрементально)
-- `GET /polling-results/{changeTime}` — результаты опросов
-
-**Аудио:**
-- `POST /audio` — загрузить аудиофайл
-- `GET /audio` — список аудиофайлов
-- `DELETE /audio/{name}` — удалить аудиофайл
-
-**Утилиты:**
-- `POST /upload-xls` — загрузить XLS/XLSX со списком номеров
-
-### Фронтенд
-
-- Semantic UI + jQuery + DataTables
-- Volt-шаблоны: `App/Views/`
-- Формы: `App/Forms/ModuleAutoDialerManageForm.php`
-
-### Интеграция с 1С
-
-Директория `1c/` содержит конфигурацию для 1C:Enterprise — каталоги, документы, регистры сведений, общие модули для синхронизации задач обзвона с CRM.
-
-### Dialplan-контексты Asterisk
-
-Генерируются в `AutoDialerConf::extensionGenContexts()`:
-- `dialer-manage-out-originate-in` — основной контекст обзвона
-- `dialer-manage-out-originate-outgoing` — инициация вызова
-- `dialer-manage-out-originate-in-callback` — callback-режим
-- `dialer-manage-out-originate-check-inner-peer-state` — проверка состояния внутреннего номера
-- `dialer-manage-out-originate-in-hangup-handler` — обработка завершения вызова
-- `dialer-polling` — контекст IVR-опросов
-- `dialer-manage-polling-{pollId}-{questionId}` — контексты для каждого вопроса
-
-### AGI-события (хуки в диалплане)
-
-`EVENT_START_DIAL_IN`, `EVENT_END_DIAL_IN`, `EVENT_AFTER_DIAL_OUT`, `EVENT_FAIL_ORIGINATE`, `EVENT_END_CALL`, `EVENT_POLLING`, `EVENT_POLLING_END`
-
-### Защита от зависших вызовов
-
-**Проблема**: если AGI/AMI событие не дошло до модуля, запись `TaskResults` остаётся незакрытой (`closeTime=0`), блокируя слот `maxCountChannels` навсегда. Известные причины потери событий:
-- Вызов заблокирован кастомным контекстом (например, `all-outgoing-custom` с лимитом каналов) — `bridgePeer` пустой, поток в `dialer-manage-out-originate-in` идёт прямо в `Hangup()`, минуя все AGI-хуки
-- Asterisk обработал call-файл, но originate завершился до срабатывания AGI
-
-**Решения**:
-1. **Диалплан**: AGI `EVENT_FAIL_ORIGINATE` вызывается перед `Hangup()` когда `bridgePeer` пустой — ловит случаи блокировки вызова кастомными контекстами
-2. **`EVENT_END_CALL` fallback**: если ни одно условие в обработчике `EVENT_END_CALL` не установило `result` — ставится `FAIL` (предотвращает `result=null` при неожиданных комбинациях состояний)
-3. **Автоочистка** (`ConnectorDB::resetStuckCallFiles()`): вызывается перед каждым `getSliceTask()`. Сбрасывает записи в переходных состояниях, зависшие дольше таймаута:
-   - `CreateCallFile` → 120с (Asterisk забирает call-файл за секунды)
-   - `endCall` → 300с (вызов уже завершён, но не закрыт — после fallback-фикса не должно случаться)
-   - Активные состояния (`afterDialOut`, `startDial`, `EVENT_POLLING`) — **не трогаются**, вызов может длиться долго
-
-### Asterisk-переменные канала
-
-- `__M_*` (наследуемые через bridge): `M_TASK_ID`, `M_OUT_NUMBER`, `M_EXTEN_TYPE`, `M_PARAMS`
-- `pt1c_*` — проприетарные переменные MikoPBX
-
-## Соглашения
-
-### Именование
-
-| Категория | Паттерн | Пример |
-|---|---|---|
-| PHP-классы | PascalCase | `TaskResults`, `YandexSynthesize` |
-| PHP-методы | camelCase | `saveStateData()`, `getSliceTask()` |
-| Таблицы БД | Префикс `m_` + PascalCase | `m_ModuleAutoDialerManage_Tasks`, `m_ModuleAutoDialerManage_TaskResults`, `m_ModuleAutoDialerManage_Polling` |
-| Колонки БД | camelCase | `phoneId`, `clientId`, `changeTime` |
-| JS-объекты | PascalCase (глобальный модуль) | `const ModuleAutoDialerManage = { ... }` |
-| HTML ID | kebab-case | `polling-table`, `module-auto-dialer-manage-form` |
-| Ключи переводов | `mod_AutoDialer_<Feature>` | `mod_AutoDialer_defDialPrefix` |
-| Хлебные крошки | `Breadcrumb<ModuleName>` | `BreadcrumbModuleAutoDialerManageModifyPolling` |
-
-### Общие правила
-
-- Комментарии в коде на русском языке
-- Локализация: 28+ языков в `Messages/*.php`
-- Логирование: `Lib/Logger.php` с ротацией в `$logPath/ModuleAutoDialerManage/`
-- AGI-скрипты подключают `bin/Globals.php` для инициализации DI-контейнера
-- Модуль лицензируется через MIKO (product_id: 128, feature_id: 52)
-
-## Паттерны кода
-
-### PHP — типизация и совместимость
-- Typed properties (PHP 7.4): `private Logger $logger;`
-- Return types всегда указаны: `:void`, `:string`, `:bool`
-- `declare(strict_types=1)` — не используется повсеместно
-- **PHP 7.4+ совместимость обязательна** — не использовать: `str_starts_with`/`str_ends_with`/`str_contains` (PHP 8.0), `match` (8.0), `?->` nullsafe (8.0), `enum` (8.1), `readonly` (8.1), `array_is_list` (8.1). Альтернативы: `strncmp($s, $prefix, strlen($prefix)) === 0` вместо `str_starts_with`
-
-### Модели — аннотации Phalcon
-Схема БД определяется через PHPDoc-аннотации:
 ```php
-/**
- * @Primary
- * @Identity
- * @Column(type="integer", nullable=false)
- */
-public $id;
+// Launch a campaign from your Laravel app
+$response = Http::post('http://your-pbx/pbxcore/api/module-dialer-manage/v1/task', [
+    'crmId' => 'INV-2025-001',
+    'name' => 'Invoice reminders',
+    'state' => 0,
+    'innerNum' => '200',
+    'innerNumType' => 'exten',
+    'maxCountChannels' => 5,
+    'dialPrefix' => '999',
+    'timeStart' => 540,           // 09:00
+    'timeEnd' => 1080,            // 18:00
+    'scheduleDays' => '1,2,3,4,5', // Mon-Fri
+    'amdEnabled' => 1,            // skip voicemails
+    'callbackUrl' => route('webhooks.dialer'),
+    'numbers' => $customers->map(fn($c) => [
+        'number' => $c->phone,
+        'params' => ['speach' => "Hello {$c->name}, your invoice is due."],
+    ])->toArray(),
+]);
 
-/**
- * @Column(type="string", nullable=true, default="")
- */
-public $name;
-```
-Типы: `integer`, `string`, `text`. Индексы через `@Indexes`. Таблица задаётся в `initialize()`:
-```php
-$this->setSource('m_ModuleAutoDialerManage_Tasks');
-```
-Связи с core-моделями MikoPBX — через `getDynamicRelations()`.
-
-### Web-контроллеры (`App/Controllers/`)
-- Наследуют `BaseController`
-- Действия: `indexAction()`, `modifyXxxAction()`, `saveAction()`, `deleteAction()`
-- Подключение ассетов: `$this->assets->collection('footerJS')->addJs(...)`
-- Передача данных в шаблон: `$this->view->form = new ModuleAutoDialerManageForm($entity)`
-- Выбор шаблона: `$this->view->pick("{$this->moduleDir}/App/Views/index")`
-
-### REST API контроллер (`Lib/RestAPI/Controllers/`)
-- Наследует `ModulesControllerBase` (другой базовый класс)
-- Парсинг JSON: приватный метод `getJsonBody()` — читает raw body, удаляет UTF-8 BOM (`\xEF\xBB\xBF`, часто приходит из 1С), затем `json_decode`. Возвращает `?array` (null при ошибке парсинга). Используется во всех POST/PUT эндпоинтах вместо `getJsonRawBody()`.
-- Ответ: `echoResponse($result)` → `json_encode()` с `JSON_PRETTY_PRINT`
-- Для больших данных — файловая передача через `ConnectorDB::saveInTmpFile()`
-
-### Маршрутизация
-- Web UI: convention-based — `ModuleAutoDialerManageController` → `/admin-cabinet/module-auto-dialer-manage/`
-- REST API: маршруты регистрируются в `AutoDialerConf::getPBXCoreRESTAdditionalRoutes()`
-
-### Volt-шаблоны (`App/Views/`)
-- Перевод: `{{ t._('mod_AutoDialer_TabPolling') }}`
-- Рендер формы: `{{ form.render('fieldName') }}`
-- Подключение partial: `{{ partial("partials/submitbutton", ['indexurl':'...']) }}`
-- Циклы: `{% for item in items %} ... {% else %} ... {% endfor %}`
-- CSS-фреймворк — Semantic UI (не Bootstrap)
-
-### Phalcon-формы (`App/Forms/`)
-- Наследуют `Form`, элементы добавляются в `initialize($entity, $options)`
-- Типы: `Text`, `TextArea`, `Select`, `Hidden`
-- CSS-классы Semantic UI указываются в параметрах элемента
-
-### JavaScript (`public/assets/js/src/`)
-- Глобальный объект-модуль: `const ModuleAutoDialerManage = { ... }`
-- Кешированные jQuery-селекторы: `$formObj`, `$checkBoxes`, `$dropDowns`
-- Глобальные зависимости: `globalRootUrl`, `globalTranslate`, `Form`, `Config`
-- AJAX: `$.ajax()` и `$.api()` (обёртка Semantic UI)
-- Инициализация Semantic UI: `.checkbox()`, `.dropdown()`, `.accordion()`, `.tab()`
-- DataTables для таблиц с серверной пагинацией
-- Обработка форм: `Form.initialize()` с коллбеками `cbBeforeSendForm`, `cbAfterSendForm`
-
-### Переводы (`Messages/`)
-- Файл на каждый язык: `en.php`, `ru.php`, `ja.php`, ...
-- Формат: `return ['key' => 'value', ...]`
-- Использование в PHP: `$this->translation->_('key')`
-- Использование в Volt: `{{ t._('key') }}`
-
-### Обработка ошибок
-- Контроллеры: `$this->flash->error(msg)` + `$this->view->success = false`
-- REST API: `getJsonBody()` возвращает `null` при невалидном JSON → контроллер отвечает `'Invalid JSON request body'`
-- Воркеры: тихий fail + запись в `Logger`
-- БД-транзакции: `$this->db->begin()` / `commit()` / `rollback()`
-
-### Совместимость версий Phalcon
-`Lib/MikoPBXVersion.php` — детекция Phalcon 4 vs 5 по версии PBX (>= 2024.2.3 = Phalcon 5).
-Статические методы возвращают правильные классы: `getLoggerClass()`, `getValidationClass()`, `getDefaultDi()`.
-
-### Установка модуля (`Setup/PbxExtensionSetup.php`)
-- Наследует `PbxExtensionSetupBase`
-- `installDB()`: создание таблиц из аннотаций → регистрация модуля → добавление в меню
-- `unInstallDB($keepSettings)`: soft-delete с сохранением данных
-- SQL-миграции отсутствуют — схема генерируется автоматически из моделей
-
-## Файловые пути (на PBX-системе)
-
-- Аудиофайлы: `{modulesDir}/ModuleAutoDialerManage/db/audio/`
-- TTS-кеш: `{moduleDir}/db/tts/` (файлы по MD5-хешу текст+голос)
-- Call-файлы: `{asterisk.astspooldir}/outgoing/` (формат: `dialer-{taskId}-{src}-{dst}.call`)
-- Temp-файлы: `{core.tempDir}/ModuleAutoDialerManage/` (fallback `/tmp/`)
-- Логи: `{logDir}/ModuleAutoDialerManage/{ClassName}.log` (ротация 10MB, 5 файлов)
-
-## Тестирование
-
-Тесты в `tests/` — PHP-скрипты без PHPUnit, со своим минимальным фреймворком. Запускаются на PBX-сервере (serber@boffart.miko.ru).
-
-Подробная документация: `tests/README.md`. Примеры curl-запросов для ручного тестирования: `tests/curl-examples.md`.
-
-### Структура тестов
-
-```
-tests/
-  lib/
-    TestRunner.php    — assert-функции (assertEq, assertTrue, assertFalse, assertContains, assertNotEmpty) и TestRunner (try/catch обёртка)
-    ApiClient.php     — HTTP-клиент REST API (curl), включая pollResults() для ожидания результатов
-    PjsuaManager.php  — управление SIP-клиентом pjsua через proc_open (E2E)
-    AmiHelper.php     — AMI-клиент для DTMF-инъекции и поиска каналов (E2E)
-  unit/
-    test-data-integrity.php — целостность данных в БД (ORM-уровень)
-    test-api-tasks.php      — CRUD задач обзвона через REST API
-    test-api-clients.php    — CRUD клиентов через REST API
-  e2e/
-    test-basic-call.php      — базовый исходящий звонок
-    test-callback.php        — callback-режим (isCallback=1)
-    test-retry.php           — повторные попытки дозвона
-    test-client-grouping.php — группировка номеров по clientId
-    test-polling-ivr.php     — IVR-опрос с DTMF через AMI PlayDTMF
-    test-working-hours.php   — рабочее время (timeStart/timeEnd)
-  e2e-config.php   — SIP-креденшлы, номера, таймауты
-  run-all.php      — запуск всех тестов (каждый в отдельном PHP-процессе)
+// Receive webhook when campaign completes
+Route::post('/webhooks/dialer', function (Request $request) {
+    Log::info('Campaign completed', $request->all());
+    return response()->json(['ok' => true]);
+});
 ```
 
-### Запуск тестов на сервере
+Complete Laravel service class + scheduled sync commands: see [Developer Guide §12](docs/DEVELOPER-GUIDE.md#12-laravel-integration-cookbook).
+
+---
+
+## Support
+
+- **Maintainer:** Bit Dream IT — support@bitdreamit.com
+- **Upstream:** MIKO LLC — help@miko.ru
+- **Source:** https://github.com/bitdreamit/ModuleAutoDialerManage
+- **Issues:** https://github.com/bitdreamit/ModuleAutoDialerManage/issues
+- **License:** GPL-3.0-or-later
+
+---
+
+## Credits
+
+This module is a fork of MIKO's `ModuleAutoDialer` v1.35. All credit for the original dialer engine, dialplan logic, AMI integration, and Yandex TTS/STT support goes to:
+
+- **Alexey Portnov** (apor@miko.ru) — original author
+- **Nikolay Beketov** (nbek@miko.ru) — original author
+
+Bit Dream IT added: live dashboard, DNC blacklist, AMD support, webhooks, scheduling, CSV import/export, summary reports, test-call feature, recording lookup, and complete documentation.
+
+---
+
+*Below is the original MIKO README, preserved for reference:*
+
+---
+
+# ModuleAutoDialerManage — модуль автообзвона для MikoPBX
+
+*Read this in other languages: [English](README.md), [Русский](readme.ru.md).*
+
+Модуль автоматического обзвона и IVR-опросов для MikoPBX. Позволяет создавать кампании массового обзвона с переводом на внутренний номер сотрудника или запуском интерактивного голосового опроса.
+
+- Документация по модулям MikoPBX: [docs.mikopbx.com](https://docs.mikopbx.com/mikopbx-development/)
+- Telegram-канал для разработчиков: [@mikopbx_dev](https://t.me/joinchat/AAPn5xSqZIpQnNnCAa3bBw)
+
+---
+
+## REST API
+
+Базовый URL: `/pbxcore/api/module-dialer-manage/v1`
+
+Все запросы и ответы используют формат JSON (`Content-Type: application/json`).
+
+### Авторизация
+
+При обращении к API не с localhost необходимо предварительно авторизоваться:
 
 ```bash
-# Все тесты (unit + e2e)
-ssh serber@boffart.miko.ru "php -f /storage/usbdisk1/mikopbx/custom_modules/ModuleAutoDialerManage/tests/run-all.php 2>&1 | grep -v '^php.backend'"
-
-# Только unit/integration
-ssh serber@boffart.miko.ru "php -f /storage/usbdisk1/mikopbx/custom_modules/ModuleAutoDialerManage/tests/run-all.php unit 2>&1 | grep -v '^php.backend'"
-
-# Только E2E
-ssh serber@boffart.miko.ru "php -f /storage/usbdisk1/mikopbx/custom_modules/ModuleAutoDialerManage/tests/run-all.php e2e 2>&1 | grep -v '^php.backend'"
-
-# Отдельный тест
-ssh serber@boffart.miko.ru "php -f /storage/usbdisk1/mikopbx/custom_modules/ModuleAutoDialerManage/tests/unit/test-api-tasks.php 2>&1 | grep -v '^php.backend'"
+curl 'http://<PBX_ADDRESS>/admin-cabinet/session/start' \
+  -X POST --cookie-jar auth-cookies.txt \
+  -H 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  --data 'login=admin&password=<PASSWORD>'
 ```
 
-### Тестовый фреймворк
+Далее все запросы к API выполнять с `--cookie auth-cookies.txt`.
 
-**TestRunner** (`tests/lib/TestRunner.php`): оборачивает каждый тест в `try/catch` (критично — необработанное исключение отключает модуль). Ведёт счётчики passed/failed на уровне тестов и assertions. Возвращает exit code 0/1.
+### Формат ответа
 
-**ApiClient** (`tests/lib/ApiClient.php`): HTTP-клиент на curl для всех REST API эндпоинтов модуля. Метод `pollResults($taskId, $changeTime, $maxWait, $interval)` выполняет polling до появления результатов.
+Все эндпоинты возвращают JSON со структурой:
 
-**PjsuaManager** (`tests/lib/PjsuaManager.php`): управляет процессом pjsua через `proc_open()` — запуск, SIP-регистрация, ожидание входящего вызова, отправка DTMF, hangup, graceful stop.
-
-**AmiHelper** (`tests/lib/AmiHelper.php`): AMI-клиент — подключение, поиск каналов по паттерну, инъекция DTMF через `PlayDTMF` (Receive=1), qualify endpoint.
-
-### Паттерн unit-тестов
-
-Unit/integration тесты используют `ApiClient` для HTTP-запросов к REST API. Для прямого доступа к БД: `$db = (new TaskResults())->getReadConnection()` (НЕ `$di->getShared('db')`). Raw SQL использует имена таблиц с префиксом `m_`.
-
-### Паттерн E2E тестов
-
-1. Создать задачу через `ApiClient::createTask()` с `state=0`
-2. Запустить PJSUA (SIP-клиент и/или оператор) через `PjsuaManager::start()`
-3. Ожидать входящий вызов (`waitForIncomingCall`)
-4. При необходимости отправить DTMF через `AmiHelper::waitAndSendDtmf()`
-5. Ожидать результат через `ApiClient::pollResults()`
-6. Проверить assertions, cleanup задачи
-
-### Конфигурация E2E: `tests/e2e-config.php`
-
-- SIP-клиент регистрируется как транк `SIP-1692280724` (порт 5080) — получает исходящие
-- SIP-оператор — внутренний номер `228` (порт 5082)
-- Маршрут: префикс `999` направлен на транк
-- PJSUA бинарники: `tests/bin/pjsua-linux-x86_64` и `tests/bin/pjsua-linux-aarch64` (в `.gitignore`)
-
-### Правила написания тестов
-
-- Unit-тесты: `require_once __DIR__ . '/../lib/TestRunner.php'` + `require_once __DIR__ . '/../lib/ApiClient.php'`
-- E2E тесты дополнительно: `require_once __DIR__ . '/../lib/PjsuaManager.php'` и/или `AmiHelper.php`
-- Конфиг: `$config = require __DIR__ . '/../e2e-config.php'`
-- Тесты прямого доступа к БД: `require_once 'Globals.php'` (первая строка — инициализирует Phalcon DI)
-- Если необработанное исключение вылетает из скрипта, MikoPBX автоматически **отключает модуль** — поэтому всегда использовать `TestRunner::run()` с try/catch
-
-### Однократное обновление структуры БД
-```bash
-ssh serber@boffart.miko.ru "php -r \"require_once 'Globals.php'; \\\$d = new \MikoPBX\Core\System\Upgrade\UpdateDatabase(); \\\$d->updateDatabaseStructure();\""
+```json
+{
+  "result": true,
+  "data": { ... },
+  "messages": []
+}
 ```
 
-### Развёртывание на PBX-сервер
-Модуль установлен в `/storage/usbdisk1/mikopbx/custom_modules/ModuleAutoDialerManage/`.
-```bash
-# Один файл
-scp <файл> serber@boffart.miko.ru:/storage/usbdisk1/mikopbx/custom_modules/ModuleAutoDialerManage/<путь>
+- `result` — `true` при успехе, `false` при ошибке
+- `data` — данные ответа
+- `messages` — массив сообщений об ошибках (при `result: false`)
 
-# Все тесты
-scp -r tests/ serber@boffart.miko.ru:/storage/usbdisk1/mikopbx/custom_modules/ModuleAutoDialerManage/tests/
+---
+
+## Задачи обзвона (Tasks)
+
+### Создание задачи
+
+**POST** `/pbxcore/api/module-dialer-manage/v1/task`
+
+Создаёт новую задачу обзвона. Если задача с указанным `crmId` уже существует — обновляет её.
+
+**Тело запроса:**
+
+| Поле | Тип | Обязательное | Описание |
+|------|-----|:---:|----------|
+| `crmId` | string | нет | Внешний идентификатор задачи (CRM). Если пустой — назначается автоматически |
+| `name` | string | нет | Название задачи |
+| `state` | integer | нет | Состояние: `0` — активна, `1` — закрыта, `2` — пауза |
+| `innerNum` | string | да | Внутренний номер сотрудника или ID опроса |
+| `innerNumType` | string | нет | Тип назначения: `exten` (по умолчанию) — перевод на сотрудника, `polling` — запуск опроса |
+| `maxCountChannels` | integer | нет | Максимальное количество одновременных каналов (по умолчанию `1`) |
+| `dialPrefix` | string | нет | Префикс набора номера (для выбора маршрута). Если пустой — используется префикс из настроек модуля |
+| `maxAttempt` | integer | нет | Максимальное количество попыток дозвона (по умолчанию `1`) |
+| `tryInterval` | integer | нет | Интервал между попытками дозвона в секундах (по умолчанию `60`) |
+| `attemptUntilSignal` | integer | нет | `1` — повторять звонки до получения внешнего сигнала (через `task-signal-close`), игнорируя статус дозвона. `0` — обычный режим (по умолчанию) |
+| `timeStart` | integer | нет | Начало рабочего времени — количество минут от 00:00 (например, `540` = 09:00). По умолчанию `0` |
+| `timeEnd` | integer | нет | Конец рабочего времени — количество минут от 00:00 (например, `1080` = 18:00). По умолчанию `1440` |
+| `isCallback` | integer | нет | `1` — режим callback (сначала звонок сотруднику, затем клиенту). `0` — обычный режим (по умолчанию) |
+| `numbers` | array | да | Список номеров для обзвона (см. форматы ниже) |
+
+**Формат `numbers` — простой (массив строк):**
+
+```json
+{
+  "numbers": ["79001234567", "79001234568"]
+}
+```
+
+**Формат `numbers` — расширенный (массив объектов):**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `number` | string | Номер телефона |
+| `clientId` | string | Идентификатор клиента. Номера с одинаковым `clientId` группируются — при успешном дозвоне на один номер остальные номера этого клиента автоматически закрываются |
+| `timeCallAllow` | string | Время, начиная с которого разрешён звонок. Формат: `DD.MM.YYYY HH:mm:ss` (учитывается часовой пояс PBX) |
+| `params` | object | Произвольные параметры, доступные в вызове (например `{"speach": "Ваша задолженность 1000 рублей"}`) |
+
+```json
+{
+  "numbers": [
+    {
+      "number": "79001234567",
+      "timeCallAllow": "15.03.2025 09:00:00",
+      "params": {"speach": "Ваша задолженность 1000 рублей"}
+    },
+    {
+      "number": "79001234568"
+    }
+  ]
+}
+```
+
+**Пример — задача с переводом на сотрудника:**
+
+```bash
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "crmId": "80001",
+    "name": "Обзвон клиентов",
+    "state": 0,
+    "innerNum": "201",
+    "innerNumType": "exten",
+    "maxCountChannels": 3,
+    "dialPrefix": "9",
+    "numbers": ["79001234567", "79001234568"]
+  }' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task
+```
+
+**Пример — задача с IVR-опросом:**
+
+```bash
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "crmId": "90001",
+    "name": "Опрос по доставке",
+    "state": 0,
+    "innerNum": "7",
+    "innerNumType": "polling",
+    "maxCountChannels": 5,
+    "dialPrefix": "9",
+    "numbers": [
+      {"number": "79001234567", "params": {"speach": "Ваш заказ 12345"}},
+      {"number": "79001234568"}
+    ]
+  }' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "id": 1000000001,
+    "crmId": "80001",
+    "name": "Обзвон клиентов",
+    "innerNum": "201",
+    "innerNumType": "exten",
+    "maxCountChannels": 3,
+    "state": 0,
+    "dialPrefix": "9"
+  },
+  "messages": []
+}
+```
+
+---
+
+### Получение списка задач
+
+**GET** `/pbxcore/api/module-dialer-manage/v1/task`
+
+**Query-параметры:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `state` | string | Фильтр по состоянию: `0`, `1`, `2` |
+| `limit` | integer | Максимальное количество записей |
+| `offset` | integer | Вернуть задачи с `id` больше указанного (пагинация по ID) |
+
+**Пример:**
+
+```bash
+# Все активные задачи
+curl 'http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task?state=0'
+
+# Первые 10 задач
+curl 'http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task?limit=10'
+
+# Задачи с id > 1000000005
+curl 'http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task?offset=1000000005&limit=10'
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "results": [
+      {
+        "id": 1000000001,
+        "crmId": "80001",
+        "name": "Обзвон клиентов",
+        "innerNum": "201",
+        "innerNumType": "exten",
+        "maxCountChannels": 3,
+        "state": 0,
+        "dialPrefix": "9"
+      }
+    ]
+  },
+  "messages": []
+}
+```
+
+---
+
+### Получение задачи по ID
+
+**GET** `/pbxcore/api/module-dialer-manage/v1/task/{id}`
+
+Возвращает данные задачи вместе с результатами обзвона и результатами опросов.
+
+```bash
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task/1000000001
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "id": 1000000001,
+    "crmId": "80001",
+    "name": "Обзвон клиентов",
+    "innerNum": "201",
+    "innerNumType": "exten",
+    "maxCountChannels": 3,
+    "state": 0,
+    "dialPrefix": "9",
+    "results": [
+      {
+        "id": 1,
+        "taskId": 1000000001,
+        "phone": "79001234567",
+        "phoneId": "9001234567",
+        "state": "endCall",
+        "result": "SUCCESS",
+        "outDialState": "ANSWER",
+        "inDialState": "ANSWER",
+        "verboseCallId": "PJSIP/...",
+        "linkedId": "...",
+        "callFile": "...",
+        "cause": "location",
+        "params": "",
+        "changeTime": 1690194700.1234,
+        "countTry": null,
+        "timeCallAllow": 0,
+        "closeTime": 1690194750.5678
+      }
+    ],
+    "resultsPoling": [
+      {
+        "id": 1,
+        "taskId": 1000000001,
+        "pollingId": "7",
+        "questionCrmId": "q1",
+        "phoneId": "9001234567",
+        "phone": "79001234567",
+        "exten": "1",
+        "result": "confirmed",
+        "changeTime": 1690194720.1234
+      }
+    ]
+  },
+  "messages": []
+}
+```
+
+---
+
+### Изменение задачи
+
+**PUT** `/pbxcore/api/module-dialer-manage/v1/task/{id}`
+
+Обновляет поля задачи. Можно передать любое подмножество полей.
+
+```bash
+# Поставить задачу на паузу
+curl -X PUT \
+  -H 'Content-Type: application/json' \
+  -d '{"state": 2}' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task/1000000001
+
+# Возобновить задачу
+curl -X PUT \
+  -H 'Content-Type: application/json' \
+  -d '{"state": 0}' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task/1000000001
+
+# Изменить количество каналов
+curl -X PUT \
+  -H 'Content-Type: application/json' \
+  -d '{"maxCountChannels": 10}' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task/1000000001
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "id": 1000000001,
+    "crmId": "80001",
+    "name": "Обзвон клиентов",
+    "innerNum": "201",
+    "innerNumType": "exten",
+    "maxCountChannels": 10,
+    "state": 0,
+    "dialPrefix": "9"
+  },
+  "messages": []
+}
+```
+
+**Ошибка — задача не найдена:**
+
+```json
+{
+  "result": false,
+  "data": {"error": "TaskNotFound"},
+  "messages": []
+}
+```
+
+---
+
+### Удаление задачи
+
+**DELETE** `/pbxcore/api/module-dialer-manage/v1/task/{id}`
+
+Удаляет задачу и все связанные результаты обзвона.
+
+```bash
+curl -X DELETE http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task/1000000001
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": [],
+  "messages": []
+}
+```
+
+---
+
+### Остановка обзвона по номеру телефона
+
+**POST** `/pbxcore/api/module-dialer-manage/v1/task-signal-close`
+
+Принудительно завершает обзвон для указанного номера телефона. Все незавершённые записи для этого номера (и всех номеров того же клиента, если задан `clientId`) получают результат `SUCCESS_EXTERNAL_SIGNAL`.
+
+**Тело запроса:**
+
+| Поле | Тип | Обязательное | Описание |
+|------|-----|:---:|----------|
+| `phone` | string | да | Номер телефона |
+| `taskId` | string | нет | ID задачи. Если пустой — останавливает обзвон по этому номеру во всех задачах |
+
+```bash
+# Остановить обзвон конкретного номера в конкретной задаче
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"phone": "79001234567", "taskId": "1000000001"}' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task-signal-close
+
+# Остановить обзвон номера во всех задачах
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"phone": "79001234567"}' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task-signal-close
+```
+
+---
+
+## Клиенты (Clients)
+
+Справочник клиентов позволяет хранить данные о клиентах с несколькими номерами телефонов и произвольными свойствами. Данные клиентов могут использоваться при обзвоне (привязка через `clientId` в номерах задачи).
+
+### Создание / обновление клиентов
+
+**POST** `/pbxcore/api/module-dialer-manage/v1/client`
+
+Принимает массив клиентов. Если клиент с указанным `crmId` уже существует — обновляет его (телефоны и свойства пересоздаются).
+
+**Тело запроса (массив):**
+
+| Поле | Тип | Обязательное | Описание |
+|------|-----|:---:|----------|
+| `crmId` | string | да | Внешний идентификатор клиента |
+| `name` | string | нет | Имя клиента |
+| `phones` | array | да | Массив номеров телефонов (строки) |
+| `properties` | array | нет | Массив свойств `[{"key": "...", "value": "..."}]` |
+
+```bash
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {
+      "crmId": "000000000001",
+      "name": "Петров Иван Степанович",
+      "phones": ["74952293042", "79052232222"],
+      "properties": [
+        {"key": "ADDRES", "value": "Москва, Георгиевский пр-кт д. 1701"},
+        {"key": "ACCOUNT_1", "value": "10000123"}
+      ]
+    }
+  ]' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/client
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Петров Иван Степанович",
+      "crmId": "000000000001",
+      "phones": [
+        {"id": 1, "phoneId": "4952293042", "phone": "74952293042", "clientId": "1"},
+        {"id": 2, "phoneId": "9052232222", "phone": "79052232222", "clientId": "1"}
+      ],
+      "properties": [
+        {"id": 1, "key": "NAME", "value": "Петров Иван Степанович", "clientId": "1"},
+        {"id": 2, "key": "ADDRES", "value": "Москва, Георгиевский пр-кт д. 1701", "clientId": "1"},
+        {"id": 3, "key": "ACCOUNT_1", "value": "10000123", "clientId": "1"}
+      ]
+    }
+  ],
+  "messages": []
+}
+```
+
+> Свойство `NAME` добавляется автоматически из поля `name`, если не передано явно в `properties`.
+
+---
+
+### Удаление клиента
+
+**DELETE** `/pbxcore/api/module-dialer-manage/v1/client/{crmId}`
+
+Удаляет клиента по его CRM-идентификатору вместе со всеми телефонами и свойствами.
+
+```bash
+curl -X DELETE http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/client/000000000001
+```
+
+---
+
+### Поиск клиента по номеру телефона
+
+**GET** `/pbxcore/api/module-dialer-manage/v1/client-by-phone/{phone}`
+
+Возвращает свойства клиента, которому принадлежит указанный номер.
+
+```bash
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/client-by-phone/74952293042
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": [
+    {"key": "NAME", "value": "Петров Иван Степанович"},
+    {"key": "ADDRES", "value": "Москва, Георгиевский пр-кт д. 1701"},
+    {"key": "ACCOUNT_1", "value": "10000123"}
+  ],
+  "messages": []
+}
+```
+
+---
+
+## Загрузка списка номеров из XLS/XLSX
+
+**POST** `/pbxcore/api/module-dialer-manage/v1/upload-xls`
+
+Загружает файл XLS/XLSX и возвращает распарсенный список номеров. Каждая строка файла — один клиент, столбцы — номера телефонов. Содержимое файла должно быть закодировано в base64.
+
+```bash
+curl -F "file=@/path/to/phones.xlsx" \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/upload-xls
+```
+
+**Ответ:**
+
+```json
+[
+  {"number": "79001234567", "clientId": "1"},
+  {"number": "79001234568", "clientId": "1"},
+  {"number": "79009876543", "clientId": "2"}
+]
+```
+
+Результат можно использовать как значение поля `numbers` при создании задачи.
+
+---
+
+## Настройка Yandex Cloud (для TTS и STT)
+
+Модуль использует Yandex SpeechKit для синтеза речи (TTS) и распознавания речи (STT).
+
+### Настройка в веб-интерфейсе MikoPBX
+
+На вкладке **Настройки** модуля необходимо заполнить:
+
+- **Yandex API Key** — секретный ключ для авторизации в API
+- **Yandex Cloud Folder ID (для STT)** — идентификатор каталога. Можно найти в адресной строке [консоли Yandex Cloud](https://console.yandex.cloud/), например: `https://console.yandex.cloud/folders/b1g99fhofn/...` — идентификатор `b1g99fhofn`
+
+### Создание сервисного аккаунта и API-ключа
+
+1. В [консоли Yandex Cloud](https://console.yandex.cloud/) откройте нужный каталог
+2. Создайте **сервисный аккаунт** с ролями:
+   - `ai.speechkit-tts.user` — генерация речи
+   - `ai.speechkit-stt.user` — распознавание речи
+3. Создайте **API-ключ** для этого сервисного аккаунта (тип: API key, для упрощённой аутентификации)
+4. Сохраните ключ в поле **Yandex API Key** в настройках модуля
+
+> Все сервисные аккаунты принадлежат каталогу, а все API-ключи — сервисному аккаунту. Идентификатор каталога и API-ключ должны относиться к одному каталогу.
+
+---
+
+## Опросы (Polling)
+
+### Создание / обновление опроса
+
+**POST** `/pbxcore/api/module-dialer-manage/v1/polling`
+
+Создаёт новый IVR-опрос или обновляет существующий (по `crmId`). После создания опроса используйте его `id` в поле `innerNum` при создании задачи с `innerNumType: "polling"`.
+
+**Тело запроса:**
+
+| Поле | Тип | Обязательное | Описание |
+|------|-----|:---:|----------|
+| `crmId` | string | нет | Внешний ID опроса. Если пустой — назначается автоматически |
+| `name` | string | нет | Название опроса |
+| `questions` | array | да | Массив вопросов |
+
+**Структура вопроса:**
+
+| Поле | Тип | Обязательное | Описание |
+|------|-----|:---:|----------|
+| `questionId` | string | нет | Идентификатор вопроса (для CRM). Если пустой — используется порядковый индекс |
+| `questionText` | string | нет* | Текст вопроса для синтеза речи через Yandex SpeechKit |
+| `questionFile` | string | нет* | Путь к WAV-файлу озвучки вопроса (приоритет над `questionText`) |
+| `lang` | string | да | Язык синтеза речи, например `ru-RU`, `en-US` |
+| `press` | array | да | Массив действий при нажатии клавиш |
+
+> *Необходимо указать либо `questionText`, либо `questionFile`.
+
+**Структура действия (`press`):**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `key` | string | Клавиша DTMF (`0`–`9`, `*`, `#`) |
+| `action` | string | Действие (см. таблицу ниже) |
+| `value` | string | Значение действия |
+| `valueOptions` | string | Тип значения: `text` — текст для синтеза, `file` — путь к аудиофайлу |
+| `nextQuestion` | string | ID следующего вопроса (пустая строка = завершение опроса) |
+
+**Типы действий (`action`):**
+
+| Значение | Описание | `value` |
+|----------|----------|---------|
+| `answer` | Зафиксировать ответ | Значение ответа, сохраняемое в результатах |
+| `dial` | Перевести на внутренний номер | Номер extension (например `201`) |
+| `playback` | Воспроизвести текст/файл | Текст для синтеза или путь к файлу (зависит от `valueOptions`) |
+| `playback_record` | Воспроизвести аудио и записать ответ клиента | Текст подсказки для синтеза |
+| `restart` | Повторить опрос заново (переход к первому вопросу) | — |
+| `""` (пустая) | Нет действия, переход к следующему вопросу | — |
+
+**Дополнительные поля действия `playback_record`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `needRecognize` | string | `"1"` — распознать речь клиента через Yandex SpeechKit STT. Длительность записи ограничена 30 секундами |
+| `recognizeLabel` | string | Краткое представление вопроса (например `"ФИО"`, `"Номер счёта"`). Используется при озвучивании подтверждения |
+
+**Тип вопроса `confirmation`:**
+
+Последний вопрос опроса может быть вопросом-подтверждением. Для этого добавьте поле `"type": "confirmation"` в объект вопроса. При озвучивании:
+
+1. Сначала воспроизводится `questionText` (например: *"Подтвердите введённые данные"*)
+2. Затем добавляются пары `recognizeLabel` + распознанный ответ клиента для каждого вопроса с `needRecognize: "1"`
+3. Генерируется аудиофайл и воспроизводится клиенту
+
+Если клиент выбирает действие `restart` — опрос начинается заново с первого вопроса. Все предыдущие ответы сохраняются в истории, при повторном подтверждении используются только последние ответы по каждому вопросу.
+
+**Пример:**
+
+```bash
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "crmId": "100001",
+    "name": "Подтверждение доставки",
+    "questions": [
+      {
+        "questionId": "q1",
+        "questionText": "Здравствуйте! Готовы ли вы принять груз? Нажмите 1, если да. Нажмите 0, если нет. Нажмите 3 для связи с оператором.",
+        "lang": "ru-RU",
+        "press": [
+          {"key": "1", "action": "answer", "value": "yes", "nextQuestion": "q2"},
+          {"key": "0", "action": "answer", "value": "no", "nextQuestion": ""},
+          {"key": "3", "action": "dial", "value": "201", "nextQuestion": ""}
+        ]
+      },
+      {
+        "questionId": "q2",
+        "questionText": "Заказать вам такси? Нажмите 1 для подтверждения, 0 для отказа.",
+        "lang": "ru-RU",
+        "press": [
+          {"key": "1", "action": "answer", "value": "taxi_yes", "nextQuestion": ""},
+          {"key": "0", "action": "answer", "value": "taxi_no", "nextQuestion": ""}
+        ]
+      }
+    ]
+  }' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/polling
+```
+
+**Пример с распознаванием речи (STT) и подтверждением:**
+
+```bash
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "crmId": "200001",
+    "name": "Сбор показаний",
+    "questions": [
+      {
+        "questionId": "0",
+        "questionText": "Вас зовут <NAME>? Если да - нажмите 1, если нет - нажмите 0.",
+        "lang": "ru-RU",
+        "press": [
+          {"key": "1", "action": "answer", "nextQuestion": "1"},
+          {"key": "0", "action": "playback_record", "value": "Представьтесь, пожалуйста.", "valueOptions": "5", "needRecognize": "1", "recognizeLabel": "ФИО", "nextQuestion": "1"}
+        ]
+      },
+      {
+        "questionId": "1",
+        "questionText": "Номер лицевого счета <ACCOUNT_1>? Нажмите 1 если верно, 0 если нет.",
+        "lang": "ru-RU",
+        "press": [
+          {"key": "1", "action": "answer", "nextQuestion": "2"},
+          {"key": "0", "action": "playback_record", "value": "Продиктуйте номер счета.", "valueOptions": "5", "needRecognize": "1", "recognizeLabel": "Лицевой счёт", "nextQuestion": "2"}
+        ]
+      },
+      {
+        "questionId": "2",
+        "questionText": "",
+        "defPress": "1",
+        "lang": "ru-RU",
+        "press": [
+          {"key": "1", "action": "playback_record", "value": "Назовите показания счётчика.", "valueOptions": "5", "needRecognize": "1", "recognizeLabel": "Показания", "nextQuestion": "3"}
+        ]
+      },
+      {
+        "questionId": "3",
+        "type": "confirmation",
+        "questionText": "Подтвердите введённые данные. Нажмите 1 если верно, 0 чтобы повторить.",
+        "defPress": "0",
+        "timeout": 10,
+        "lang": "ru-RU",
+        "press": [
+          {"key": "1", "action": "answer"},
+          {"key": "0", "action": "restart", "nextQuestion": "0"}
+        ]
+      }
+    ]
+  }' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/polling
+```
+
+> Плейсхолдеры `<NAME>`, `<ACCOUNT_1>`, `<ADDRES>` подставляются из данных клиента (см. раздел "Клиенты"). `<NAME>` — имя клиента из поля `name`, остальные — из `properties`.
+
+**Пример с аудиофайлом вместо TTS:**
+
+```bash
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Опрос с аудио",
+    "questions": [
+      {
+        "questionId": "1",
+        "questionFile": "/storage/usbdisk1/mikopbx/custom_modules/ModuleAutoDialerManage/db/audio/greeting.wav",
+        "lang": "ru-RU",
+        "press": [
+          {"key": "1", "action": "answer", "value": "1", "nextQuestion": ""},
+          {"key": "2", "action": "playback", "value": "Спасибо за ваш ответ", "valueOptions": "text", "nextQuestion": ""}
+        ]
+      }
+    ]
+  }' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/polling
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "id": 7,
+    "crmId": "100001",
+    "name": "Подтверждение доставки"
+  },
+  "messages": []
+}
+```
+
+---
+
+### Получение списка опросов
+
+**GET** `/pbxcore/api/module-dialer-manage/v1/polling`
+
+```bash
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/polling
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "results": [
+      {"id": 7, "crmId": "100001", "name": "Подтверждение доставки"},
+      {"id": 8, "crmId": "100002", "name": "Опрос удовлетворённости"}
+    ]
+  },
+  "messages": []
+}
+```
+
+---
+
+### Получение опроса по ID
+
+**GET** `/pbxcore/api/module-dialer-manage/v1/polling/{id}`
+
+Возвращает полную структуру опроса с вопросами и действиями.
+
+```bash
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/polling/7
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "id": 7,
+    "crmId": "100001",
+    "name": "Подтверждение доставки",
+    "questions": [
+      {
+        "id": 15,
+        "questionText": "Здравствуйте! Готовы ли вы принять груз?...",
+        "questionFile": "",
+        "lang": "ru-RU",
+        "press": [
+          {"key": "1", "action": "answer", "value": "yes", "valueOptions": null, "nextQuestion": "16"},
+          {"key": "0", "action": "answer", "value": "no", "valueOptions": null, "nextQuestion": ""},
+          {"key": "3", "action": "dial", "value": "201", "valueOptions": null, "nextQuestion": ""}
+        ]
+      },
+      {
+        "id": 16,
+        "questionText": "Заказать вам такси?...",
+        "questionFile": "",
+        "lang": "ru-RU",
+        "press": [
+          {"key": "1", "action": "answer", "value": "taxi_yes", "valueOptions": null, "nextQuestion": ""},
+          {"key": "0", "action": "answer", "value": "taxi_no", "valueOptions": null, "nextQuestion": ""}
+        ]
+      }
+    ]
+  },
+  "messages": []
+}
+```
+
+> **Важно:** после сохранения опроса поле `nextQuestion` в действиях содержит внутренний `id` вопроса (а не переданный `questionId`). Используйте ответ на `GET /polling/{id}` для получения маппинга.
+
+---
+
+### Удаление опроса
+
+**DELETE** `/pbxcore/api/module-dialer-manage/v1/polling/{id}`
+
+Удаляет опрос вместе со всеми вопросами и действиями.
+
+```bash
+curl -X DELETE http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/polling/7
+```
+
+---
+
+## Результаты обзвона
+
+### Получение результатов (инкрементально)
+
+**GET** `/pbxcore/api/module-dialer-manage/v1/results/{changeTime}`
+
+Возвращает результаты обзвона, изменённые начиная с указанного timestamp. Используйте для периодического опроса: сохраняйте максимальный `changeTime` из ответа и передавайте его в следующем запросе.
+
+```bash
+# Все результаты (changeTime = 0)
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/results/0
+
+# Результаты с определённого момента
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/results/1690194629
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "results": [
+      {
+        "id": 1,
+        "taskId": 1000000001,
+        "phone": "79001234567",
+        "phoneId": "9001234567",
+        "state": "endCall",
+        "result": "SUCCESS",
+        "outDialState": "ANSWER",
+        "inDialState": "ANSWER",
+        "verboseCallId": "...",
+        "linkedId": "...",
+        "callFile": "...",
+        "cause": "location",
+        "params": "",
+        "changeTime": 1690194700.1234,
+        "countTry": null,
+        "timeCallAllow": 0,
+        "closeTime": 1690194750.5678
+      }
+    ]
+  },
+  "messages": []
+}
+```
+
+**Поля результата (TaskResults):**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `id` | integer | ID записи |
+| `taskId` | integer | ID задачи |
+| `phone` | string | Полный номер телефона |
+| `phoneId` | string | Индекс номера (последние 10 цифр) |
+| `clientId` | string | Идентификатор клиента (для группировки номеров одного клиента) |
+| `state` | string | Текущее состояние вызова (см. ниже) |
+| `result` | string | Итоговый результат (см. коды результатов) |
+| `outDialState` | string | Статус внешнего вызова (`ANSWER`, `NO ANSWER`, `BUSY`, `CHANUNAVAIL`) |
+| `inDialState` | string | Статус внутреннего вызова |
+| `verboseCallId` | string | Идентификатор вызова |
+| `linkedId` | string | Linked ID вызова в Asterisk |
+| `callFile` | string | Имя call-файла |
+| `cause` | string | Причина завершения вызова (Asterisk TECH_CAUSE) |
+| `params` | string | Сериализованные параметры (PHP `serialize()`) |
+| `changeTime` | float | Время последнего изменения (Unix timestamp с микросекундами) |
+| `attemptNumber` | integer | Номер текущей попытки дозвона (начиная с `1`) |
+| `timeCallAllow` | integer | Unix timestamp разрешённого времени звонка |
+| `closeTime` | float | Время завершения вызова (0 — вызов ещё не завершён) |
+
+**Состояния вызова (`state`):**
+
+| Значение | Описание |
+|----------|----------|
+| `CreateTask` | Задача создана, ожидание обзвона |
+| `CreateCallFile` | Call-файл создан, ожидание Asterisk |
+| `afterDialOut` | Выполнен набор внешнего номера |
+| `startDial` | Начат перевод на внутренний номер |
+| `endDial` | Завершён перевод на внутренний номер |
+| `EVENT_POLLING` | Идёт опрос |
+| `EVENT_POLLING_END` | Опрос завершён |
+| `endCall` | Вызов завершён |
+| `failedOriginate` | Ошибка инициации вызова |
+| `allUserBusy` | Все сотрудники заняты |
+| `UserCancelCallback` | Сотрудник отменил callback-вызов |
+
+**Коды результатов (`result`):**
+
+| Код | Описание |
+|-----|----------|
+| `SUCCESS` | Успешный вызов |
+| `SUCCESS_CLIENT_H` | Клиент положил трубку после разговора |
+| `SUCCESS_USER_H` | Сотрудник положил трубку после разговора |
+| `SUCCESS_POLLING` | Опрос успешно завершён |
+| `SUCCESS_ANOTHER_PHONE` | Дозвонились на другой номер того же клиента |
+| `SUCCESS_EXTERNAL_SIGNAL` | Обзвон остановлен внешним сигналом (`task-signal-close`) |
+| `FAIL` | Общая ошибка |
+| `FAIL_CLIENT_H_BEFORE_ANSWER` | Клиент положил трубку до ответа сотрудника |
+| `FAIL_USER_NO_ANSWER` | Сотрудник не ответил |
+| `FAIL_USER_BUSY` | Сотрудник занят |
+| `FAIL_ROUTE` | Маршрут не найден |
+| `FAIL_PROVIDER` | Провайдер недоступен |
+| `FAIL_POLLING` | Ошибка опроса (клиент повесил трубку во время опроса) |
+
+---
+
+### Получение результатов опросов (инкрементально)
+
+**GET** `/pbxcore/api/module-dialer-manage/v1/polling-results/{changeTime}`
+
+```bash
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/polling-results/0
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "results": [
+      {
+        "id": 107,
+        "taskId": -1,
+        "pollingId": "22",
+        "questionCrmId": "0",
+        "phoneId": "4952290003",
+        "phone": "74952290003",
+        "result": "-",
+        "exten": "mikopbx-1773823480.3-dialer-manage-polling-22-0-.wav",
+        "changeTime": "1773823495.547",
+        "verboseCallId": "[C-00000002]",
+        "linkedId": "mikopbx-1773823480.3",
+        "recognizedText": "Попов алексей владимирович",
+        "recognizeLabel": "ФИО"
+      }
+    ]
+  },
+  "messages": []
+}
+```
+
+**Поля результата опроса (PolingResults):**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `id` | integer | ID записи |
+| `taskId` | integer | ID задачи обзвона (`-1` для входящих звонков) |
+| `pollingId` | string | ID опроса |
+| `questionCrmId` | string | CRM-идентификатор вопроса |
+| `phoneId` | string | Индекс номера (последние 10 цифр) |
+| `phone` | string | Полный номер телефона |
+| `exten` | string | Нажатая клавиша или путь к WAV-записи |
+| `result` | string | Значение ответа (из поля `value` действия) |
+| `changeTime` | float | Время ответа (Unix timestamp) |
+| `verboseCallId` | string | Идентификатор вызова для отладки |
+| `linkedId` | string | Linked ID вызова в Asterisk (группирует ответы одного звонка) |
+| `recognizedText` | string | Распознанный текст (Yandex STT). Пустой если `needRecognize` не включён |
+| `recognizeLabel` | string | Краткое представление вопроса (настраивается в web-интерфейсе) |
+
+> При повторе опроса (действие `restart`) все ответы клиента сохраняются в истории. В ответе API могут быть несколько записей с одинаковым `questionCrmId` и `linkedId` — последняя запись является актуальной.
+
+---
+
+## Аудиофайлы
+
+### Загрузка аудиофайла
+
+**POST** `/pbxcore/api/module-dialer-manage/v1/audio`
+
+Загружает аудиофайл и автоматически конвертирует его в формат, совместимый с Asterisk.
+
+**Рекомендуемые характеристики:** MP3 или WAV, 1 канал (mono), 8 kHz, 16 bit.
+
+```bash
+curl -F "file=@/path/to/audio.mp3" \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/audio
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": {
+    "filename": "/storage/usbdisk1/mikopbx/custom_modules/ModuleAutoDialerManage/db/audio/474d57f8204699fbb2249f20dede5f8e.mp3"
+  },
+  "messages": []
+}
+```
+
+---
+
+### Список аудиофайлов
+
+**GET** `/pbxcore/api/module-dialer-manage/v1/audio`
+
+```bash
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/audio
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "greeting.mp3",
+      "path": "/storage/.../db/audio/474d57f8204699fbb2249f20dede5f8e.mp3"
+    }
+  ],
+  "messages": []
+}
+```
+
+---
+
+### Удаление аудиофайла
+
+**DELETE** `/pbxcore/api/module-dialer-manage/v1/audio/{name}`
+
+Удаляет аудиофайл и все его конвертированные версии.
+
+```bash
+curl -X DELETE http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/audio/greeting.mp3
+```
+
+**Ответ:**
+
+```json
+{
+  "result": true,
+  "data": [],
+  "messages": []
+}
+```
+
+---
+
+## Полный пример рабочего процесса
+
+### 1. Создание опроса
+
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{
+    "crmId": "poll-001",
+    "name": "Подтверждение заказа",
+    "questions": [{
+      "questionId": "q1",
+      "questionText": "Здравствуйте! Подтвердите заказ номер 12345. Нажмите 1 для подтверждения, 0 для отмены.",
+      "lang": "ru-RU",
+      "press": [
+        {"key": "1", "action": "answer", "value": "confirmed", "nextQuestion": ""},
+        {"key": "0", "action": "answer", "value": "cancelled", "nextQuestion": ""}
+      ]
+    }]
+  }' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/polling
+```
+
+Запоминаем `id` из ответа (например `7`).
+
+### 2. Создание задачи обзвона
+
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{
+    "crmId": "task-001",
+    "name": "Обзвон по заказам",
+    "state": 0,
+    "innerNum": "7",
+    "innerNumType": "polling",
+    "maxCountChannels": 5,
+    "dialPrefix": "9",
+    "numbers": [
+      {"number": "79001234567"},
+      {"number": "79001234568"},
+      {"number": "79001234569"}
+    ]
+  }' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task
+```
+
+### 3. Мониторинг результатов
+
+```bash
+# Первый запрос — получить все результаты
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/results/0
+
+# Последующие запросы — только новые/изменённые
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/results/1690194700
+
+# Результаты опросов
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/polling-results/0
+```
+
+### 4. Получение полной информации по задаче
+
+```bash
+curl http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task/1000000001
+```
+
+### 5. Закрытие задачи
+
+```bash
+curl -X PUT -H 'Content-Type: application/json' \
+  -d '{"state": 1}' \
+  http://127.0.0.1/pbxcore/api/module-dialer-manage/v1/task/1000000001
 ```

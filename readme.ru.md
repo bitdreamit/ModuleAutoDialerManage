@@ -1,12 +1,20 @@
-# Шаблон модуля расширения для MikoPBX
-
-_Read this in other languages:_ [_English_](./)_,_ [_Русский_](readme.ru.md)_._
-
-## Описание модуля расширения
-
-Документацию по разработке и установке собственного модуля можно найти по ссылке [https://docs.mikopbx.com](https://docs.mikopbx.com/mikopbx-development/)
-
-### Вопросы
-
-Подключайтесь к каналу для разрабочиков в telegram [@mikopbx\_dev](https://t.me/joinchat/AAPn5xSqZIpQnNnCAa3bBw)
-
+{
+  "developer": "Bit Dream IT",
+  "moduleUniqueID": "ModuleAutoDialerManage",
+  "support_email": "support@bitdreamit.com",
+  "version": "1.35",
+  "min_pbx_version": "2024.1.114",
+  "wiki_links": {
+    "ru": {
+      "https://wiki.mikopbx.com/module-auto-dialer-manage": "https://docs.mikopbx.com/mikopbx/modules/miko/module-auto-dialer-manage"
+    },
+    "en": {
+      "https://wiki.mikopbx.com/module-auto-dialer-manage": "https://docs.mikopbx.com/mikopbx/v/english/modules/miko/module-auto-dialer-manage"
+    }
+  },
+  "release_settings": {
+    "publish_release": true,
+    "changelog_enabled": true,
+    "create_github_release": true
+  }
+}

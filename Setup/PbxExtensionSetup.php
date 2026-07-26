@@ -69,18 +69,44 @@ class PbxExtensionSetup extends PbxExtensionSetupBase
     }
 
     /**
-     * Create folders on PBX system and apply rights
+     * Create folders on PBX system and apply rights.
+     *
+     * Bit Dream IT extension: this method runs on EVERY module install/update,
+     * unlike installDB() which only runs on first install. We use this to
+     * re-register the sidebar menu items so that upgrading an already-installed
+     * module (uploading a new zip) properly adds new menu items without
+     * requiring a full uninstall+reinstall.
      *
      * @return bool result of installation
      */
     public function installFiles(): bool
     {
-        return parent::installFiles();
+        $result = parent::installFiles();
+        if ($result) {
+            // Always re-register sidebar items on every install/update.
+            // addToSidebar() is idempotent (uses findFirstByKey + update/insert).
+            $this->addToSidebar();
+        }
+        return $result;
+    }
+
+    /**
+     * Bit Dream IT extension: also re-register sidebar items after the module
+     * is enabled (covers the case where user disables → re-enables the module
+     * without re-installing files).
+     */
+    public function onAfterModuleEnable(): void
+    {
+        $this->addToSidebar();
     }
 
     /**
      * Bit Dream IT extension: registers sidebar menu items for ALL module pages.
-     * Pages: main, campaigns, dashboard, blacklist, results, polling-results, audio.
+     * Pages: main, campaigns, dashboard, blacklist, results, polling-results, audio, apiguide.
+     *
+     * This method is IDEMPOTENT — uses findFirstByKey + update/insert, so it
+     * can be called multiple times safely (called from installDB, installFiles,
+     * and onAfterModuleEnable).
      */
     public function addToSidebar(): bool
     {
