@@ -139,6 +139,9 @@ class ModuleAutoDialerManageController extends BaseController
         $footerCollection->addJs('js/vendor/datatable/dataTables.semanticui.js', true);
         $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-auto-dialer-manage-index.js", true);
         $footerCollection->addJs('js/vendor/jquery.tablednd.min.js', true);
+        // Bit Dream IT extension: Vue.js for the new tabs (campaigns, dashboard, results, etc.)
+        $footerCollection->addJs('js/vendor/vue.js', true);
+        $footerCollection->addJs("js/cache/{$this->moduleUniqueID}/module-auto-dialer-manage-index-tabs.js", true);
 
         // Add CSS files to the header collection
         $headerCollectionCSS = $this->assets->collection('headerCSS');
@@ -157,6 +160,12 @@ class ModuleAutoDialerManageController extends BaseController
             $extensions[$index]['pollingIdFAILName'] = $pollings[$extension['pollingIdFAIL']];
         }
         $this->view->extensions = $extensions;
+        // Bit Dream IT extension: data for the new tabs (campaigns, results, etc.)
+        $this->view->apiBaseUrl = "/pbxcore/api/module-dialer-manage/v1";
+        $scheme = ($_SERVER['HTTPS'] ?? 'off') === 'on' ? 'https' : 'http';
+        $this->view->pbxHost    = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        $this->view->tasks      = \Modules\ModuleAutoDialerManage\Models\Tasks::find(['order' => 'id DESC'])->toArray();
+        $this->view->pollings   = Polling::find()->toArray();
         // Assign the form and view template
         $this->view->form = new ModuleAutoDialerManageForm($settings, []);
         $this->view->pick("{$this->moduleDir}/App/Views/index");

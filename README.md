@@ -16,22 +16,35 @@ A professional outbound campaign dialer that turns MikoPBX into a complete call-
 - 📋 [**Changelog**](docs/CHANGELOG.md) — what's new in this Bit Dream IT edition
 - 🐛 [**Issue tracker**](https://github.com/bitdreamit/ModuleAutoDialerManage/issues) — bug reports & feature requests
 
-## After install — sidebar shows 8 items
+## After install — single "Auto dialer" sidebar item with 10 tabs
 
-The module adds 8 menu items under **Routing** in the MikoPBX sidebar:
+The module adds ONE menu item to the MikoPBX sidebar: **Auto dialer** (under **Routing**). Click it, and you see 10 tabs at the top of the page:
 
-| # | Sidebar item | Purpose |
+| # | Tab | Purpose |
 |---|---|---|
-| 1 | **Auto dialer** | Original module page (settings, extensions, surveys tables) |
-| 2 | **Campaigns** | List + create + edit + delete + pause/resume campaigns (UI) |
-| 3 | **Dialer dashboard** | Live overview + per-campaign detail with live stats |
-| 4 | **Call results** | Browse/filter/export call results |
-| 5 | **IVR answers** | Browse poll/survey answers |
-| 6 | **Audio files** | Upload/manage pre-recorded prompts |
-| 7 | **DNC blacklist** | Manage Do-Not-Call numbers |
-| 8 | **API guide** | **In-module REST API reference** with copy-paste examples (curl, Laravel, PHP, Python, JS) |
+| 1 | **Polling** (original) | Create/edit IVR surveys (multi-question branching trees) |
+| 2 | **Extensions** (original) | Map internal extensions to surveys |
+| 3 | **Settings** (original) | TTS service, Yandex API key, default dial prefix, CRM connection |
+| 4 | **🎯 Campaigns** | List + create + edit + pause/resume + delete campaigns (Vue-powered) |
+| 5 | **📊 Dashboard** | Live overview — campaign cards with in-progress counts + agent status grid (auto-refresh 4s) |
+| 6 | **📞 Call results** | Browse/filter/export call results with stats bar |
+| 7 | **📋 IVR answers** | Browse poll/survey answers |
+| 8 | **🎵 Audio files** | Upload/manage pre-recorded prompts (WAV/MP3, inline player) |
+| 9 | **🚫 DNC blacklist** | Manage Do-Not-Call numbers |
+| 10 | **💻 API guide** | In-module REST API reference with curl/Laravel/Python examples + endpoint table |
 
-**Both UI and API work at the same time.** The web UI calls the same REST endpoints documented in the API guide. You can use the UI for day-to-day operations AND call the API from external systems (Laravel, Python, 1C, etc.) simultaneously — they share the same database.
+**Why tabs instead of separate sidebar items?** Tabs work immediately on install — no DB registration needed. If you upgrade an already-installed module, the new tabs appear without needing to clear the sidebar menu cache or run SQL fixes.
+
+**Both UI and API work at the same time.** The web UI calls the same REST endpoints documented in the API guide tab. You can use the UI for day-to-day operations AND call the API from external systems (Laravel, Python, 1C, etc.) simultaneously — they share the same database.
+
+### Drill-down pages (separate URLs)
+
+Some actions take you to dedicated full-page views:
+- `/admin-cabinet/module-auto-dialer-manage/campaignForm` — full create/edit campaign form (all fields + CSV import)
+- `/admin-cabinet/module-auto-dialer-manage/campaignForm/{id}` — edit existing campaign
+- `/admin-cabinet/module-auto-dialer-manage/dashboard/{id}` — single-campaign detail dashboard
+- `/admin-cabinet/module-auto-dialer-manage/apiGuide` — full standalone API guide page (5 language tabs)
+- `/admin-cabinet/module-auto-dialer-manage/blacklist` — standalone DNC blacklist page (if you prefer it full-page)
 
 ---
 
